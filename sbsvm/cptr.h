@@ -1,6 +1,5 @@
-
-#ifndef CPTR_H
-#define CPTR_H
+#ifndef CPTR_CU_H
+#define CPTR_CU_H
 
 #include "cpupointer.h"
 
@@ -117,7 +116,7 @@ private:
 };
 
 template <typename T>
-__device__ T CPtr<T>::read()
+__device__ inline T CPtr<T>::read()
 {
   doCache();
   
@@ -132,7 +131,7 @@ __device__ T CPtr<T>::read()
 }
 
 template <typename T>
-__device__ void CPtr<T>::write(const T &value)
+__device__ inline void CPtr<T>::write(const T &value)
 {
   using namespace cpu_pointer;
   doCache();
@@ -180,7 +179,7 @@ __device__ void CPtr<T>::write(const T &value)
 
 
 template <typename T>
-__device__ void CPtr<T>::atomicAdd(const T &value)
+__device__ inline void CPtr<T>::atomicAdd(const T &value)
 {
   using namespace cpu_pointer;
   
@@ -226,7 +225,7 @@ __device__ void CPtr<T>::atomicAdd(const T &value)
 }
 
 template <typename T>
-__device__ void CPtr<T>::doCache()
+__device__ inline void CPtr<T>::doCache()
 {
   if (__any(!valid))
     setValid();
@@ -241,7 +240,7 @@ __device__ void CPtr<T>::clear()
 
 
 template <typename T>
-__device__ void CPtr<T>::setValid()
+__device__ inline void CPtr<T>::setValid()
 {
   using namespace cpu_pointer;
 
@@ -381,7 +380,7 @@ __device__ void CPtr<T>::setValid()
 }
 
 template <typename T>
-__device__ void CPtr<T>::setInvalid()
+__device__ inline void CPtr<T>::setInvalid()
 {
   using namespace cpu_pointer;
 
@@ -418,7 +417,7 @@ __device__ void CPtr<T>::setInvalid()
 }
 
 template <typename T>
-__device__ void CPtr<T>::setValues()
+__device__ inline void CPtr<T>::setValues()
 {
   using namespace cpu_pointer;
   page_addr = (std::uintptr_t)ptr & PAGE_MASK;
@@ -427,4 +426,4 @@ __device__ void CPtr<T>::setValues()
   tag = &d_tag[tag_index];
 }
 
-#endif // CPTR_H
+#endif // CPTR_CU_H

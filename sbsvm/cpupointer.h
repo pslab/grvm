@@ -146,10 +146,8 @@ namespace cpu_pointer {
       std::uintptr_t ptr;
       #if UINTPTR_MAX == ULLONG_MAX
       unsigned long long int i;
-      #elif UINTPTR_MAX == ULONG_MAX
-      unsigned long int i;
-      #elif UINTPTR_MAX == USHRT_MAX
-      unsigned short int i;
+      #elif UINTPTR_MAX == UINT_MAX
+      unsigned int i;
       #endif
     };
     ptr = val;
