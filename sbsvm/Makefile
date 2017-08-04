@@ -23,7 +23,7 @@ $(OUT) : $(CUSRC) $(INCLUDES) Sbsvm.cu org_sbsvm_Sbsvm.h
 	nvcc --shared --compiler-options '-fPIC' $(CUFLAGS) $(CXXFLAGS) -I$(JAVA_HOME)/include -I$(JAVA_HOME)/include/linux -o $@ $(CUSRC) Sbsvm.cu
 
 clean :
-	rm $(OUT) example org/sbsvm/Sbsvm.class org_sbsvm_Sbsvm.h
+	rm $(OUT) example org/sbsvm/Sbsvm.class org_sbsvm_Sbsvm.h Test.class
 
 example : example.cu $(CUSRC) $(INCLUDES)
 	nvcc $(CUFLAGS) $(CXXFLAGS) -o $@ example.cu $(CUSRC)
