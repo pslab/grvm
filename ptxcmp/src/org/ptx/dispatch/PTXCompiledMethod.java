@@ -5,6 +5,8 @@
  */
 package org.ptx.dispatch;
 
+import org.sbsvm.Sbsvm;
+
 import java.io.*;
 
 import org.jikesrvm.classloader.NormalMethod;
@@ -46,6 +48,8 @@ public class PTXCompiledMethod {
 	}
 
 	public void invoke(Object...args) {
-		Util._assert(false, "TBI");
+	        Sbsvm.getInstance().test();
+		Sbsvm.getInstance().run();
+		//Util._assert(false, "TBI");
 	}
 }
