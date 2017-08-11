@@ -18,6 +18,7 @@ bin/libsbsvm.so: Makefile
 	cp sbsvm/libsbsvm.so bin/
 
 clean:
+	$(MAKE) -C sbsvm clean
 	rm -rf bin/jitptx.jar bin/libsbsvm.so classes
 
 test:  bin/jitptx.jar bin/libsbsvm.so
