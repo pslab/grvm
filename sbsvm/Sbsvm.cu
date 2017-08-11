@@ -1,43 +1,31 @@
 #include "org_sbsvm_Sbsvm.h"
 
 #include "cptr.h"
-
-#define MAT_SIZE (1*1024ul)
-
-__global__ void gpu_client(float (*A)[MAT_SIZE], float (*B)[MAT_SIZE], float (*C)[MAT_SIZE])
-{
-  const int j = blockIdx.x * blockDim.x + threadIdx.x;
-  const int i = blockIdx.y * blockDim.y + threadIdx.y;
-
-  CPtr<float> a = A[i];
-  CPtr<float> b = &B[0][j];
-  CPtr<float> c = &C[i][j];
-
-  if (i<MAT_SIZE && j<MAT_SIZE) {
-    float result = 0;
-    for (size_t x=0; x<MAT_SIZE; ++x) {
-      float fa = a.read();
-      float fb = b.read();
-      result += fa * fb;
-      ++a;
-      B+=MAT_SIZE;
-    }
-    c.write(result);
-  }
-}
+#include "example.h"
 
 extern "C" {
-
 /*
  * Class:     org_sbsvm_Sbsvm
- * Method:    init
+ * Method:    initialize
  * Signature: ()V
  */
-JNIEXPORT void JNICALL Java_org_sbsvm_Sbsvm_init
-  (JNIEnv *, jclass)
+JNIEXPORT void JNICALL Java_org_sbsvm_Sbsvm_initialize
+  (JNIEnv *env, jobject o)
 {
   cpu_pointer::initialize();
 }
+
+/*
+ * Class:     org_sbsvm_Sbsvm
+ * Method:    finalize
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_org_sbsvm_Sbsvm_finalize
+  (JNIEnv *env, jobject o)
+{
+  cpu_pointer::finalize();
+}
+
 
 /*
  * Class:     org_sbsvm_Sbsvm
@@ -45,21 +33,9 @@ JNIEXPORT void JNICALL Java_org_sbsvm_Sbsvm_init
  * Signature: ()V
  */
 JNIEXPORT void JNICALL Java_org_sbsvm_Sbsvm_clear
-  (JNIEnv *, jclass)
+  (JNIEnv *env, jobject o)
 {
   cpu_pointer::clear_cache();
-}
-
-
-/*
- * Class:     org_sbsvm_Sbsvm
- * Method:    fin
- * Signature: ()V
- */
-JNIEXPORT void JNICALL Java_org_sbsvm_Sbsvm_fin
-  (JNIEnv *, jclass)
-{
-  cpu_pointer::finalize();
 }
 
 /*
@@ -68,7 +44,7 @@ JNIEXPORT void JNICALL Java_org_sbsvm_Sbsvm_fin
  * Signature: ()V
  */
 JNIEXPORT void JNICALL Java_org_sbsvm_Sbsvm_run
-  (JNIEnv *, jclass)
+  (JNIEnv *env, jobject o)
 {
   cpu_pointer::run_handler();
 }
@@ -79,7 +55,7 @@ JNIEXPORT void JNICALL Java_org_sbsvm_Sbsvm_run
  * Signature: ()V
  */
 JNIEXPORT void JNICALL Java_org_sbsvm_Sbsvm_test
-  (JNIEnv *, jclass)
+  (JNIEnv *env, jobject o)
 {
   float (*A)[MAT_SIZE] = new float[MAT_SIZE][MAT_SIZE];
   float (*B)[MAT_SIZE] = new float[MAT_SIZE][MAT_SIZE];

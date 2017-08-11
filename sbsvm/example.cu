@@ -1,3 +1,5 @@
+#include "example.h"
+
 #include <cuda.h>
 
 #include <cstdint>
@@ -8,9 +10,6 @@
 
 #include "helper_cuda.h"
 #include "cptr.h"
-
-
-#define MAT_SIZE (1*1024ul)
 
 
 __global__ void gpu_client(float (*A)[MAT_SIZE], float (*B)[MAT_SIZE], float (*C)[MAT_SIZE])

@@ -1,36 +1,33 @@
 
 OUT = libsbsvm.so
 
-CXXFLAGS = -std=c++11 -O2
-CUFLAGS = --machine 32 -D_FORCE_INLINES -gencode arch=compute_35,code=sm_35 -gencode arch=compute_52,code=sm_52 --relocatable-device-code=true
+CXXFLAGS = -std=c++11 -O2 -I$(JAVA_HOME)/include -I$(JAVA_HOME)/include/linux
+CUFLAGS = --shared -Xcompiler -fPIC -gencode arch=compute_35,code=sm_35 -gencode arch=compute_52,code=sm_52 --relocatable-device-code=true
 
-CUSRC = cpupointer.cu memcpy.cu 
-INCLUDES = memcpy.h cpupointer.h cptr.h
+CUSRC = cpupointer.cu memcpy.cu Sbsvm.cu example.cu
+INCLUDES = memcpy.h cpupointer.h cptr.h org_sbsvm_Sbsvm.h example.h
+
+.PHONY: all debug test clean
 
 all : $(OUT)
 
 debug : CXXFLAGS += -DDEBUG -g -lineinfo
 debug : $(OUT)
-debug : example	
 
-Sbsvm.class : org/sbsvm/Sbsvm.java
+org/sbsvm/Sbsvm.class : org/sbsvm/Sbsvm.java
 	javac -source 6 -target 6 $<
 
-org_sbsvm_Sbsvm.h : Sbsvm.class
+org_sbsvm_Sbsvm.h : org/sbsvm/Sbsvm.class
 	javah -jni org.sbsvm.Sbsvm
 
-$(OUT) : $(CUSRC) $(INCLUDES) Sbsvm.cu org_sbsvm_Sbsvm.h
-	nvcc --shared --compiler-options '-fPIC' $(CUFLAGS) $(CXXFLAGS) -I$(JAVA_HOME)/include -I$(JAVA_HOME)/include/linux -o $@ $(CUSRC) Sbsvm.cu
-
-clean :
-	rm $(OUT) example org/sbsvm/Sbsvm.class org_sbsvm_Sbsvm.h Test.class
-
-example : example.cu $(CUSRC) $(INCLUDES)
-	nvcc $(CUFLAGS) $(CXXFLAGS) -o $@ example.cu $(CUSRC)
+$(OUT) : $(CUSRC) $(INCLUDES) 
+	nvcc $(CUFLAGS) $(CXXFLAGS) -o $@ $(CUSRC)
 
 Test.class: Test.java
 	javac -source 6 -target 6 $<
 
-test : example Test.class
-	./example
+test : $(OUT) Test.class
 	rvm Test
+
+clean :
+	rm -f Test.class $(OUT) org_sbsvm_Sbsvm.h org/sbsvm/Sbsvm.class
