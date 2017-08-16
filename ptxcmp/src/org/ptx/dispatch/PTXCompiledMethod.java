@@ -8,6 +8,8 @@ package org.ptx.dispatch;
 import org.sbsvm.Sbsvm;
 
 import java.io.*;
+import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
 
 import org.jikesrvm.classloader.NormalMethod;
 
@@ -39,7 +41,9 @@ public class PTXCompiledMethod {
 		bw.flush();
 		os.write('\0');
 		os.close();
-		return os.toByteArray();
+		String str = os.toString();
+		final Charset ASCII_CHARSET = Charset.forName("US-ASCII");
+		return str.getBytes(ASCII_CHARSET);
 	}
 
 	public void dumpPTXAssembly() {
@@ -47,9 +51,33 @@ public class PTXCompiledMethod {
 		System.out.write(ptxAssemblyCode, 0, ptxAssemblyCode.length-1);
 	}
 
+        ByteBuffer module;
+        ByteBuffer func;
+
 	public void invoke(Object...args) {
-	        Sbsvm.getInstance().test();
+	        if(module == null) {
+		    load();
+		    System.out.println("module loaded");
+		}
+	        ByteBuffer stream = Sbsvm.getInstance().createStream();
+		Sbsvm.getInstance().launchKernel(func, 1, 1, 1, 1, 1, 1, 0, stream);
+		System.out.println("kernel launched");
 		Sbsvm.getInstance().run();
+				  
+	        //Sbsvm.getInstance().test();
+		//Sbsvm.getInstance().run();
+		
 		//Util._assert(false, "TBI");
 	}
+
+        private void load() {
+	        ByteBuffer buf = ByteBuffer.allocateDirect(ptxAssemblyCode.length);
+	        buf.put(ptxAssemblyCode);
+	        module = Sbsvm.getInstance().loadModule(buf);
+		final Charset ASCII_CHARSET = Charset.forName("US-ASCII");
+		byte[] name = entryPointName.getBytes(ASCII_CHARSET);
+	        buf = ByteBuffer.allocateDirect(name.length+1);
+	        buf.put(name);
+		func = Sbsvm.getInstance().getFunction(module, buf);
+        }
 }
