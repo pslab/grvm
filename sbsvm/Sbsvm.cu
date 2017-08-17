@@ -1,14 +1,23 @@
 #include "org_sbsvm_Sbsvm.h"
 
+#include <cstdlib>
 #include <iostream>
+#include <vector>
 
 #include <cuda.h>
 
 #include "cptr.h"
 #include "example.h"
 
-static jclass ByteBuffer;
-static jmethodID allocateDirect;
+
+#define BUFFER_SIZE 8192
+
+
+static CUdevice device;
+static CUcontext context;
+static std::vector<CUmodule> module;
+static std::vector<CUfunction> function;
+static std::vector<CUstream> stream;
 
 extern "C" {
 /*
@@ -19,9 +28,26 @@ extern "C" {
 JNIEXPORT void JNICALL Java_org_sbsvm_Sbsvm_initialize
   (JNIEnv *env, jobject o)
 {
-  ByteBuffer = env->FindClass("java/nio/ByteBuffer");
-  allocateDirect = env->GetStaticMethodID(ByteBuffer, "allocateDirect", "(I)Ljava/nio/ByteBuffer;");
+  // Initialize
+  cuInit(0);
+
+  // Get number of devices supporting CUDA
+  int deviceCount = 0;
+  cuDeviceGetCount(&deviceCount);
+  if (deviceCount == 0) {
+    std::cerr << "There is no device supporting CUDA." << std::endl;
+    std::exit(0);
+  }
+
+  // Get handle for device 0
+  cuDeviceGet(&device, 0);
+
+  // Create context
+  cuCtxCreate(&context, 0, device);
+    
   cpu_pointer::initialize();
+  
+  cuCtxPopCurrent(&context);
 }
 
 /*
@@ -61,68 +87,79 @@ JNIEXPORT void JNICALL Java_org_sbsvm_Sbsvm_run
 /*
  * Class:     org_sbsvm_Sbsvm
  * Method:    loadModule
- * Signature: (Ljava/nio/ByteBuffer;)Ljava/nio/ByteBuffer;
+ * Signature: (Ljava/nio/ByteBuffer;)J
  */
-JNIEXPORT jobject JNICALL Java_org_sbsvm_Sbsvm_loadModule
+JNIEXPORT jlong JNICALL Java_org_sbsvm_Sbsvm_loadModule
   (JNIEnv *env, jobject o, jobject image)
 {
   const void *pImage = env->GetDirectBufferAddress(image);
-  CUmodule module;
-  cuModuleLoadData(&module, pImage);
-  jobject ret = env->CallStaticObjectMethod(ByteBuffer, allocateDirect, (jint)sizeof(CUmodule));
-  CUmodule *pModule = reinterpret_cast<CUmodule*>(env->GetDirectBufferAddress(ret));
-  *pModule = module;
-  return ret;
+  
+  cuCtxPushCurrent(context);
+  CUmodule m;
+  CUjit_option options[3];
+  void* values[3];
+  char error_log[BUFFER_SIZE];
+  options[0] = CU_JIT_ERROR_LOG_BUFFER;
+  values[0]  = (void*)error_log;
+  options[1] = CU_JIT_ERROR_LOG_BUFFER_SIZE_BYTES;
+  values[1]  = (void*)BUFFER_SIZE;
+  options[2] = CU_JIT_TARGET_FROM_CUCONTEXT;
+  values[2]  = 0;
+  int err = cuModuleLoadDataEx(&m, pImage, 3, options, values);
+  if (err != CUDA_SUCCESS) {
+    std::cerr << "Link error:" << std::endl << error_log << std::endl;
+    std::exit(0);
+  }
+  cuCtxPopCurrent(&context);
+  
+  module.push_back(m);
+  return module.size()-1;
 }
 
 /*
  * Class:     org_sbsvm_Sbsvm
  * Method:    getFunction
- * Signature: (Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;)Ljava/nio/ByteBuffer;
+ * Signature: (JLjava/nio/ByteBuffer;)J
  */
-JNIEXPORT jobject JNICALL Java_org_sbsvm_Sbsvm_getFunction
-  (JNIEnv *env, jobject o, jobject module, jobject name)
+JNIEXPORT jlong JNICALL Java_org_sbsvm_Sbsvm_getFunction
+  (JNIEnv *env, jobject o, jlong moduleID, jobject name)
 {
-  CUmodule *pModule = reinterpret_cast<CUmodule*>(env->GetDirectBufferAddress(module));
   char *pName = reinterpret_cast<char*>(env->GetDirectBufferAddress(name));
-  CUfunction func;
-  std::cout << "0!!!!!!!!!!!!!!!!!" << std::endl;
-  cuModuleGetFunction(&func, *pModule, pName);
-  std::cout << "1!!!!!!!!!!!!!!!!!" << std::endl;
-  jobject ret = env->CallStaticObjectMethod(ByteBuffer, allocateDirect, (jint)sizeof(CUfunction));
-  CUfunction *pFunc = reinterpret_cast<CUfunction*>(env->GetDirectBufferAddress(ret));
-  *pFunc = func;
-  return ret;
-
+  CUfunction f;
+  cuCtxPushCurrent(context);
+  cuModuleGetFunction(&f, module[moduleID], pName);
+  cuCtxPopCurrent(&context);
+  function.push_back(f);
+  return function.size()-1;
 }
 
 /*
  * Class:     org_sbsvm_Sbsvm
  * Method:    createStream
- * Signature: ()Ljava/nio/ByteBuffer;
+ * Signature: ()J
  */
-JNIEXPORT jobject JNICALL Java_org_sbsvm_Sbsvm_createStream
+JNIEXPORT jlong JNICALL Java_org_sbsvm_Sbsvm_createStream
   (JNIEnv *env, jobject o)
 {
-  CUstream stream;
-  cuStreamCreate(&stream, CU_STREAM_NON_BLOCKING);
-  jobject ret = env->CallStaticObjectMethod(ByteBuffer, allocateDirect, (jint)sizeof(CUstream));
-  CUstream *pStream = reinterpret_cast<CUstream*>(env->GetDirectBufferAddress(ret));
-  *pStream = stream;
-  return ret;
+  CUstream s;
+  cuCtxPushCurrent(context);
+  cuStreamCreate(&s, CU_STREAM_NON_BLOCKING);
+  cuCtxPopCurrent(&context);
+  stream.push_back(s);
+  return stream.size()-1;
 }
 
 /*
  * Class:     org_sbsvm_Sbsvm
  * Method:    launchKernel
- * Signature: (Ljava/nio/ByteBuffer;JJJJJJJLjava/nio/ByteBuffer;)V
+ * Signature: (JJJJJJJJJ)V
  */
 JNIEXPORT void JNICALL Java_org_sbsvm_Sbsvm_launchKernel
-  (JNIEnv *env, jobject o, jobject function, jlong gridDimX, jlong gridDimY, jlong gridDimZ, jlong blockDimX, jlong blockDimY, jlong blockDimZ, jlong sharedMemBytes, jobject stream)
+  (JNIEnv *env, jobject o, jlong functionID, jlong gridDimX, jlong gridDimY, jlong gridDimZ, jlong blockDimX, jlong blockDimY, jlong blockDimZ, jlong sharedMemBytes, jlong streamID)
 {
-  CUfunction *pFunc = reinterpret_cast<CUfunction*>(env->GetDirectBufferAddress(function));
-  CUstream *pStream = reinterpret_cast<CUstream*>(env->GetDirectBufferAddress(stream));
-  cuLaunchKernel(*pFunc, gridDimX, gridDimY, gridDimZ, blockDimX, blockDimY, blockDimZ, sharedMemBytes, *pStream, nullptr, nullptr);
+  cuCtxPushCurrent(context);
+  cuLaunchKernel(function[functionID], gridDimX, gridDimY, gridDimZ, blockDimX, blockDimY, blockDimZ, sharedMemBytes, stream[streamID], nullptr, nullptr);
+  cuCtxPopCurrent(&context);
 }
 
 /*
